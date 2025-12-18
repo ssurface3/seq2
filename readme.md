@@ -21,7 +21,7 @@ This project implements a high-performance Named Entity Recognition (NER) pipeli
 ## Installation
 Requirements for the code runningg
 ```bash
-pip install torch transformers datasets evaluate seqeval optuna numpy pandas
+pip install -r requirements.txt
 ```
 
 ## Data Format
@@ -104,3 +104,7 @@ word1    predicted_label
 word2    predicted_label
 ...
 ```
+
+    # how to use it?
+    chmod +x run_pipeline.sh </br>
+    ./run_pipeline.sh
