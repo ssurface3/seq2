@@ -6,23 +6,17 @@ from transformers import (
     Trainer, 
     DataCollatorForTokenClassification
 )
-import input_data  # Importing our helper file
+import input_data  
 
-# --- SETTINGS ---
 TRAIN_FILE = "train.tsv" 
-# If you have a separate dev file, change this. Otherwise it splits train automatically.
 VAL_FILE = None 
-# OUTPUT_DIR = "roberta-srl-model"
 MODEL_CHECKPOINT = "microsoft/deberta-v3-large" 
 OUTPUT_DIR = "microsoft/deberta-v3-large" 
-# Or if you have a GPU with >12GB VRAM, try "microsoft/deberta-v3-large"
 
 def main():
-    # 1. Prepare Data
     print("Loading and tokenizing data...")
     tokenized_datasets, tokenizer = input_data.get_tokenized_dataset(TRAIN_FILE, VAL_FILE)
     
-    # 2. Load Model
     print("Loading Model...")
     model = AutoModelForTokenClassification.from_pretrained(
         input_data.MODEL_CHECKPOINT,
@@ -31,7 +25,6 @@ def main():
         label2id=input_data.LABEL2ID
     )
     
-    # 3. Define Metrics
     seqeval = evaluate.load("seqeval")
     
     def compute_metrics(p):
@@ -55,7 +48,6 @@ def main():
             "accuracy": results["overall_accuracy"],
         }
 
-    # 4. Training Arguments
     args = TrainingArguments(
         output_dir=OUTPUT_DIR,
         eval_strategy="epoch",
@@ -67,7 +59,7 @@ def main():
         weight_decay=0.01,
         load_best_model_at_end=True,
         metric_for_best_model="f1",
-        save_total_limit=2, # Only keep the last 2 checkpoints to save space
+        save_total_limit=2, 
         push_to_hub=False,
     )
 
@@ -83,11 +75,10 @@ def main():
         compute_metrics=compute_metrics,
     )
 
-    # 5. Run Training
+    
     print("Starting training...")
     trainer.train()
     
-    # 6. Save Final Model
     print(f"Saving model to {OUTPUT_DIR}")
     trainer.save_model(OUTPUT_DIR)
     tokenizer.save_pretrained(OUTPUT_DIR)

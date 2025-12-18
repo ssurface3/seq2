@@ -2,8 +2,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForTokenClassification
 import input_data
 
-# --- SETTINGS ---
-# Use the folder created by train_advanced.py
+
 MODEL_PATH = "deberta-optimized-model" 
 TEST_FILE = "test_no_answers.tsv"
 OUTPUT_FILE = "submission_deberta.tsv"
@@ -11,8 +10,6 @@ OUTPUT_FILE = "submission_deberta.tsv"
 def predict():
     print(f"Loading DeBERTa model from {MODEL_PATH}...")
     
-    # 1. Load Tokenizer & Model
-    # We load the tokenizer base to ensure we have the sentencepiece files
     tokenizer = AutoTokenizer.from_pretrained("microsoft/deberta-v3-base")
     model = AutoModelForTokenClassification.from_pretrained(MODEL_PATH)
     
@@ -20,7 +17,6 @@ def predict():
     model.to(device)
     model.eval()
 
-    # 2. Read Test Data
     raw_data = input_data.read_conll_file(TEST_FILE)
     sentences = raw_data['tokens']
 
@@ -52,7 +48,6 @@ def predict():
                     aligned_labels.append(label_str)
                     previous_word_idx = word_idx
             
-            # Fill logic
             while len(aligned_labels) < len(sentence_tokens):
                 aligned_labels.append("O")
             aligned_labels = aligned_labels[:len(sentence_tokens)]

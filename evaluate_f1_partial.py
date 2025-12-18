@@ -1,7 +1,6 @@
 import os
 import sys
 import numpy as np
-#from sklearn.metrics import f1_score
 from f1_score_partial import f1_score
 
 
@@ -18,7 +17,6 @@ def parse_input(path):
     return labels
 
 
-# extract labels only
 def read_conll(path):
     labels = []
     cur_sent = []
@@ -36,14 +34,12 @@ def read_conll(path):
 
 def main(reference, submission, output_filename):
     out = open(output_filename, 'w')
-    # compute all the F1-scores
     ref = read_conll(reference)
     hyp = read_conll(submission)
     ind_scores, weights = f1_score(ref, hyp, partial=True, average=None)
     f1_avg = np.average(ind_scores, weights=weights)
     ind_scores_strict, weights_strict = f1_score(ref, hyp, partial=False, average=None)
     f1_avg_strict = np.average(ind_scores_strict, weights=weights_strict)
-
     out.write(f'f1_average_strict: {f1_avg_strict:.6f}\n')
     out.write(f'f1_aspect_strict: {ind_scores_strict[0]:.6f}\n')
     out.write(f'f1_object_strict: {ind_scores_strict[1]:.6f}\n')

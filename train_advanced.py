@@ -9,15 +9,15 @@ from transformers import (
 )
 import evaluate
 import numpy as np
-import input_data  # Uses your existing input_data.py
+import input_data  
 import optuna
 
-# --- CONFIGURATION ---
-MODEL_CHECKPOINT = "microsoft/deberta-v3-large" # Stronger than RoBERTa
+
+MODEL_CHECKPOINT = "microsoft/deberta-v3-large" 
 TRAIN_FILE = "train.tsv"
 OUTPUT_DIR = "deberta-optimized-model"
 
-# --- 1. CALCULATE WEIGHTS AUTOMATICALLY ---
+
 def get_class_weights(tokenized_dataset):
     """
     Calculates weights based on Inverse Class Frequency.
@@ -26,28 +26,19 @@ def get_class_weights(tokenized_dataset):
     labels = [label for sublist in tokenized_dataset['labels'] for label in sublist if label != -100]
     classes, counts = np.unique(labels, return_counts=True)
     
-    # Calculate inverse frequency
+
     weights = 1.0 / (counts / len(labels))
     
-    # Normalize so 'O' (usually index 0) is around 1.0
+
     weights = weights / weights[0] 
     
-    # --- MANUAL OVERRIDE FOR COMPETITION ---
-    # The math above is good, but for competitions, we want to be AGGRESSIVE.
-    # Your Aspect score is 0.66. We need to force the model to look at it.
-    # Let's manually boost Aspect IDs.
-    
-    # Map IDs to Labels to be sure
-    # 0: O, 1: B-Object, 2: I-Object, 3: B-Aspect, 4: I-Aspect...
-    
-    # Boost Aspects (usually IDs 3 and 4) by 2x more than the calculated value
-    weights[3] *= 2.0  # B-Aspect
-    weights[4] *= 2.0  # I-Aspect
+    weights[3] *= 2.0  
+    weights[4] *= 2.0  
     
     print("Calculated Class Weights:", weights)
     return torch.tensor(weights, dtype=torch.float32)
 
-# --- 2. CUSTOM TRAINER WITH WEIGHTED LOSS ---
+
 class WeightedTrainer(Trainer):
     def __init__(self, class_weights, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -58,25 +49,22 @@ class WeightedTrainer(Trainer):
         outputs = model(**inputs)
         logits = outputs.get("logits")
         
-        # --- FIX: Get device from the inputs instead of model.device ---
-        # This is the standard PyTorch way that never fails
         device = inputs["input_ids"].device
         
-        # Move class_weights to the correct GPU/CPU
+
         if self.class_weights.device != device:
             self.class_weights = self.class_weights.to(device)
 
-        # Standard CrossEntropy with weights
+   
         loss_fct = nn.CrossEntropyLoss(weight=self.class_weights)
         
-        # Reshape for loss calculation
+   
         if labels is not None:
             loss = loss_fct(logits.view(-1, self.model.config.num_labels), labels.view(-1))
             return (loss, outputs) if return_outputs else loss
         else:
             return outputs
 
-# --- 3. METRICS ---
 seqeval = evaluate.load("seqeval")
 def compute_metrics(p):
     predictions, labels = p
@@ -92,21 +80,18 @@ def compute_metrics(p):
     ]
 
     results = seqeval.compute(predictions=true_predictions, references=true_labels)
-    # We optimize for the AVERAGE of the parts to boost the weak Aspect score
     return {
         "f1": results["overall_f1"],
         "accuracy": results["overall_accuracy"],
     }
 
-# --- 4. MAIN OPTIMIZATION LOOP ---
+
 def main():
     print("Loading Data...")
     tokenized_datasets, tokenizer = input_data.get_tokenized_dataset(TRAIN_FILE)
     
-    # Calculate weights based on Train set
     class_weights = get_class_weights(tokenized_datasets["train"])
 
-    # Model Initializer (Required for Optuna to restart every trial)
     def model_init():
         return AutoModelForTokenClassification.from_pretrained(
             MODEL_CHECKPOINT,
@@ -115,7 +100,6 @@ def main():
             label2id=input_data.LABEL2ID
         )
 
-    # Define Search Space
     def hp_space(trial):
         return {
             "learning_rate": trial.suggest_float("learning_rate", 1e-5, 5e-5, log=True),
@@ -124,21 +108,19 @@ def main():
             "num_train_epochs": trial.suggest_int("num_train_epochs", 3, 6)
         }
 
-    # Base Arguments
     args = TrainingArguments(
         output_dir=OUTPUT_DIR,
         eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
         metric_for_best_model="f1",
-        save_total_limit=1, # Save space
+        save_total_limit=1, 
         push_to_hub=False,
         disable_tqdm=False 
     )
 
     data_collator = DataCollatorForTokenClassification(tokenizer)
 
-    # Initialize Trainer with our Custom Class
     trainer = WeightedTrainer(
         class_weights=class_weights,
         model_init=model_init,
@@ -154,13 +136,13 @@ def main():
     best_run = trainer.hyperparameter_search(
         direction="maximize",
         hp_space=hp_space,
-        n_trials=10,  # How many experiments to run (Higher = Better but slower)
+        n_trials=10,  
         backend="optuna"
     )
 
     print(f"Best Run Found: {best_run}")
 
-    # --- 5. FINAL TRAIN WITH BEST PARAMS ---
+    
     print("Training final model with best parameters...")
     for n, v in best_run.hyperparameters.items():
         setattr(trainer.args, n, v)

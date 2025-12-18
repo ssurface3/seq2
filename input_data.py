@@ -2,9 +2,7 @@ import os
 from datasets import Dataset, DatasetDict
 from transformers import AutoTokenizer
 
-# --- CONFIGURATION (UPDATED TO DEBERTA) ---
 # We use DeBERTa V3 Base. 
-# Note: You must run "pip install sentencepiece" for this to work.
 MODEL_CHECKPOINT = "microsoft/deberta-v3-base" 
 
 LABEL_LIST = ["O", "B-Object", "I-Object", "B-Aspect", "I-Aspect", "B-Predicate", "I-Predicate"]
